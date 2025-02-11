@@ -8,9 +8,9 @@ import {
   Team,
   WorkflowState,
   IssueLabel,
-} from "@linear/sdk"
-import { Server } from "@modelcontextprotocol/sdk/server/index.js"
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
+} from "@linear/sdk";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequest,
   CallToolRequestSchema,
@@ -23,79 +23,79 @@ import {
   Tool,
   ResourceTemplate,
   Prompt,
-} from "@modelcontextprotocol/sdk/types.js"
-import dotenv from "dotenv"
+} from "@modelcontextprotocol/sdk/types.js";
+import dotenv from "dotenv";
 
 interface CreateIssueArgs {
-  title: string
-  teamId: string
-  description?: string
-  priority?: number
-  status?: string
+  title: string;
+  teamId: string;
+  description?: string;
+  priority?: number;
+  status?: string;
 }
 
 interface UpdateIssueArgs {
-  id: string
-  title?: string
-  description?: string
-  priority?: number
-  status?: string
+  id: string;
+  title?: string;
+  description?: string;
+  priority?: number;
+  status?: string;
 }
 
 interface SearchIssuesArgs {
-  query?: string
-  teamId?: string
-  limit?: number
-  status?: string
-  assigneeId?: string
-  labels?: string[]
-  priority?: number
-  estimate?: number
-  includeArchived?: boolean
+  query?: string;
+  teamId?: string;
+  limit?: number;
+  status?: string;
+  assigneeId?: string;
+  labels?: string[];
+  priority?: number;
+  estimate?: number;
+  includeArchived?: boolean;
 }
 
 interface GetUserIssuesArgs {
-  userId?: string
-  includeArchived?: boolean
-  limit?: number
+  userId?: string;
+  includeArchived?: boolean;
+  limit?: number;
 }
 
 interface AddCommentArgs {
-  issueId: string
-  body: string
-  createAsUser?: string
-  displayIconUrl?: string
+  issueId: string;
+  body: string;
+  createAsUser?: string;
+  displayIconUrl?: string;
 }
 
 interface RateLimiterMetrics {
-  totalRequests: number
-  requestsInLastHour: number
-  averageRequestTime: number
-  queueLength: number
-  lastRequestTime: number
+  totalRequests: number;
+  requestsInLastHour: number;
+  averageRequestTime: number;
+  queueLength: number;
+  lastRequestTime: number;
 }
 
 interface LinearIssueResponse {
-  identifier: string
-  title: string
-  priority: number | null
-  status: string | null
-  stateName?: string
-  url: string
+  identifier: string;
+  title: string;
+  priority: number | null;
+  status: string | null;
+  stateName?: string;
+  url: string;
 }
 
 class RateLimiter {
-  public readonly requestsPerHour = 1400
-  private queue: (() => Promise<any>)[] = []
-  private processing = false
-  private lastRequestTime = 0
-  private readonly minDelayMs = 3600000 / this.requestsPerHour
-  private requestTimes: number[] = []
-  private requestTimestamps: number[] = []
+  public readonly requestsPerHour = 1400;
+  private queue: (() => Promise<any>)[] = [];
+  private processing = false;
+  private lastRequestTime = 0;
+  private readonly minDelayMs = 3600000 / this.requestsPerHour;
+  private requestTimes: number[] = [];
+  private requestTimestamps: number[] = [];
 
   async enqueue<T>(fn: () => Promise<T>, operation?: string): Promise<T> {
-    const startTime = Date.now()
-    const queuePosition = this.queue.length
+    const startTime = Date.now();
+    const queuePosition = this.queue.length;
 
     console.log(
       JSON.stringify({
@@ -109,7 +109,7 @@ class RateLimiter {
           timestamp: new Date().toISOString(),
         },
       })
-    )
+    );
 
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
@@ -125,11 +125,11 @@ class RateLimiter {
                 timestamp: new Date().toISOString(),
               },
             })
-          )
+          );
 
-          const result = await fn()
-          const endTime = Date.now()
-          const duration = endTime - startTime
+          const result = await fn();
+          const endTime = Date.now();
+          const duration = endTime - startTime;
 
           console.log(
             JSON.stringify({
@@ -143,10 +143,10 @@ class RateLimiter {
                 timestamp: new Date().toISOString(),
               },
             })
-          )
+          );
 
-          this.trackRequest(startTime, endTime, operation)
-          resolve(result)
+          this.trackRequest(startTime, endTime, operation);
+          resolve(result);
         } catch (error) {
           console.error(
             JSON.stringify({
@@ -160,41 +160,41 @@ class RateLimiter {
                 timestamp: new Date().toISOString(),
               },
             })
-          )
-          reject(error)
+          );
+          reject(error);
         }
-      })
-      this.processQueue()
-    })
+      });
+      this.processQueue();
+    });
   }
 
   private async processQueue() {
-    if (this.processing || this.queue.length === 0) return
-    this.processing = true
+    if (this.processing || this.queue.length === 0) return;
+    this.processing = true;
 
     while (this.queue.length > 0) {
-      const now = Date.now()
-      const timeSinceLastRequest = now - this.lastRequestTime
+      const now = Date.now();
+      const timeSinceLastRequest = now - this.lastRequestTime;
 
       const requestsInLastHour = this.requestTimestamps.filter(
         (t) => t > now - 3600000
-      ).length
+      ).length;
       if (
         requestsInLastHour >= this.requestsPerHour * 0.9 &&
         timeSinceLastRequest < this.minDelayMs
       ) {
-        const waitTime = this.minDelayMs - timeSinceLastRequest
-        await new Promise((resolve) => setTimeout(resolve, waitTime))
+        const waitTime = this.minDelayMs - timeSinceLastRequest;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
 
-      const fn = this.queue.shift()
+      const fn = this.queue.shift();
       if (fn) {
-        this.lastRequestTime = Date.now()
-        await fn()
+        this.lastRequestTime = Date.now();
+        await fn();
       }
     }
 
-    this.processing = false
+    this.processing = false;
   }
 
   async batch<T>(
@@ -203,37 +203,37 @@ class RateLimiter {
     fn: (item: any) => Promise<T>,
     operation?: string
   ): Promise<T[]> {
-    const batches = []
+    const batches = [];
     for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize)
+      const batch = items.slice(i, i + batchSize);
       batches.push(
         Promise.all(
           batch.map((item) => this.enqueue(() => fn(item), operation))
         )
-      )
+      );
     }
 
-    const results = await Promise.all(batches)
-    return results.flat()
+    const results = await Promise.all(batches);
+    return results.flat();
   }
 
   private trackRequest(startTime: number, endTime: number, operation?: string) {
-    const duration = endTime - startTime
-    this.requestTimes.push(duration)
-    this.requestTimestamps.push(startTime)
+    const duration = endTime - startTime;
+    this.requestTimes.push(duration);
+    this.requestTimestamps.push(startTime);
 
     // Keep only last hour of requests
-    const oneHourAgo = Date.now() - 3600000
+    const oneHourAgo = Date.now() - 3600000;
     this.requestTimestamps = this.requestTimestamps.filter(
       (t) => t > oneHourAgo
-    )
-    this.requestTimes = this.requestTimes.slice(-this.requestTimestamps.length)
+    );
+    this.requestTimes = this.requestTimes.slice(-this.requestTimestamps.length);
   }
 
   getMetrics(): RateLimiterMetrics {
-    const now = Date.now()
-    const oneHourAgo = now - 3600000
-    const recentRequests = this.requestTimestamps.filter((t) => t > oneHourAgo)
+    const now = Date.now();
+    const oneHourAgo = now - 3600000;
+    const recentRequests = this.requestTimestamps.filter((t) => t > oneHourAgo);
 
     return {
       totalRequests: this.requestTimestamps.length,
@@ -245,19 +245,19 @@ class RateLimiter {
           : 0,
       queueLength: this.queue.length,
       lastRequestTime: this.lastRequestTime,
-    }
+    };
   }
 }
 
 class LinearMCPClient {
-  private client: LinearClient
-  public readonly rateLimiter: RateLimiter
+  private client: LinearClient;
+  public readonly rateLimiter: RateLimiter;
 
   constructor(apiKey: string) {
     if (!apiKey)
-      throw new Error("LINEAR_API_KEY environment variable is required")
-    this.client = new LinearClient({ apiKey })
-    this.rateLimiter = new RateLimiter()
+      throw new Error("LINEAR_API_KEY environment variable is required");
+    this.client = new LinearClient({ apiKey });
+    this.rateLimiter = new RateLimiter();
   }
 
   private async getIssueDetails(issue: Issue) {
@@ -265,7 +265,7 @@ class LinearMCPClient {
       issue.state,
       issue.assignee,
       issue.team,
-    ]
+    ];
 
     const [state, assignee, team] = await Promise.all([
       this.rateLimiter.enqueue(async () =>
@@ -277,17 +277,17 @@ class LinearMCPClient {
       this.rateLimiter.enqueue(async () =>
         teamPromise ? await teamPromise : null
       ),
-    ])
+    ]);
 
     return {
       state,
       assignee,
       team,
-    }
+    };
   }
 
   private addMetricsToResponse(response: any) {
-    const metrics = this.rateLimiter.getMetrics()
+    const metrics = this.rateLimiter.getMetrics();
     return {
       ...response,
       metadata: {
@@ -301,7 +301,7 @@ class LinearMCPClient {
           lastRequestTime: new Date(metrics.lastRequestTime).toISOString(),
         },
       },
-    }
+    };
   }
 
   async listIssues() {
@@ -312,13 +312,13 @@ class LinearMCPClient {
           orderBy: LinearDocument.PaginationOrderBy.UpdatedAt,
         }),
       "listIssues"
-    )
+    );
 
     const issuesWithDetails = await this.rateLimiter.batch(
       result.nodes,
       5,
       async (issue) => {
-        const details = await this.getIssueDetails(issue)
+        const details = await this.getIssueDetails(issue);
         return {
           uri: `linear-issue:///${issue.id}`,
           mimeType: "application/json",
@@ -333,21 +333,21 @@ class LinearMCPClient {
               : undefined,
             team: details.team ? await details.team.name : undefined,
           },
-        }
+        };
       },
       "getIssueDetails"
-    )
+    );
 
-    return this.addMetricsToResponse(issuesWithDetails)
+    return this.addMetricsToResponse(issuesWithDetails);
   }
 
   async getIssue(issueId: string) {
     const result = await this.rateLimiter.enqueue(() =>
       this.client.issue(issueId)
-    )
-    if (!result) throw new Error(`Issue ${issueId} not found`)
+    );
+    if (!result) throw new Error(`Issue ${issueId} not found`);
 
-    const details = await this.getIssueDetails(result)
+    const details = await this.getIssueDetails(result);
 
     return this.addMetricsToResponse({
       id: result.id,
@@ -359,7 +359,7 @@ class LinearMCPClient {
       assignee: details.assignee?.name,
       team: details.team?.name,
       url: result.url,
-    })
+    });
   }
 
   async createIssue(args: CreateIssueArgs) {
@@ -369,27 +369,27 @@ class LinearMCPClient {
       description: args.description,
       priority: args.priority,
       stateId: args.status,
-    })
+    });
 
-    const issue = await issuePayload.issue
-    if (!issue) throw new Error("Failed to create issue")
-    return issue
+    const issue = await issuePayload.issue;
+    if (!issue) throw new Error("Failed to create issue");
+    return issue;
   }
 
   async updateIssue(args: UpdateIssueArgs) {
-    const issue = await this.client.issue(args.id)
-    if (!issue) throw new Error(`Issue ${args.id} not found`)
+    const issue = await this.client.issue(args.id);
+    if (!issue) throw new Error(`Issue ${args.id} not found`);
 
     const updatePayload = await issue.update({
       title: args.title,
       description: args.description,
       priority: args.priority,
       stateId: args.status,
-    })
+    });
 
-    const updatedIssue = await updatePayload.issue
-    if (!updatedIssue) throw new Error("Failed to update issue")
-    return updatedIssue
+    const updatedIssue = await updatePayload.issue;
+    if (!updatedIssue) throw new Error("Failed to update issue");
+    return updatedIssue;
   }
 
   async searchIssues(args: SearchIssuesArgs) {
@@ -399,7 +399,7 @@ class LinearMCPClient {
         first: args.limit || 10,
         includeArchived: args.includeArchived,
       })
-    )
+    );
 
     const issuesWithDetails = await this.rateLimiter.batch(
       result.nodes,
@@ -409,9 +409,9 @@ class LinearMCPClient {
           this.rateLimiter.enqueue(() => issue.state) as Promise<WorkflowState>,
           this.rateLimiter.enqueue(() => issue.assignee) as Promise<User>,
           this.rateLimiter.enqueue(() => issue.labels()) as Promise<{
-            nodes: IssueLabel[]
+            nodes: IssueLabel[];
           }>,
-        ])
+        ]);
 
         return {
           id: issue.id,
@@ -424,11 +424,11 @@ class LinearMCPClient {
           assignee: assignee?.name || null,
           labels: labels?.nodes?.map((label: IssueLabel) => label.name) || [],
           url: issue.url,
-        }
+        };
       }
-    )
+    );
 
-    return this.addMetricsToResponse(issuesWithDetails)
+    return this.addMetricsToResponse(issuesWithDetails);
   }
 
   async getUserIssues(args: GetUserIssuesArgs) {
@@ -438,17 +438,17 @@ class LinearMCPClient {
           ? await this.rateLimiter.enqueue(() =>
               this.client.user(args.userId as string)
             )
-          : await this.rateLimiter.enqueue(() => this.client.viewer)
+          : await this.rateLimiter.enqueue(() => this.client.viewer);
 
       const result = await this.rateLimiter.enqueue(() =>
         user.assignedIssues({
           first: args.limit || 50,
           includeArchived: args.includeArchived,
         })
-      )
+      );
 
       if (!result?.nodes) {
-        return this.addMetricsToResponse([])
+        return this.addMetricsToResponse([]);
       }
 
       const issuesWithDetails = await this.rateLimiter.batch(
@@ -457,7 +457,7 @@ class LinearMCPClient {
         async (issue) => {
           const state = (await this.rateLimiter.enqueue(
             () => issue.state
-          )) as WorkflowState
+          )) as WorkflowState;
           return {
             id: issue.id,
             identifier: issue.identifier,
@@ -466,15 +466,15 @@ class LinearMCPClient {
             priority: issue.priority,
             stateName: state?.name || "Unknown",
             url: issue.url,
-          }
+          };
         },
         "getUserIssues"
-      )
+      );
 
-      return this.addMetricsToResponse(issuesWithDetails)
+      return this.addMetricsToResponse(issuesWithDetails);
     } catch (error) {
-      console.error(`Error in getUserIssues: ${error}`)
-      throw error
+      console.error(`Error in getUserIssues: ${error}`);
+      throw error;
     }
   }
 
@@ -484,32 +484,32 @@ class LinearMCPClient {
       body: args.body,
       createAsUser: args.createAsUser,
       displayIconUrl: args.displayIconUrl,
-    })
+    });
 
-    const comment = await commentPayload.comment
-    if (!comment) throw new Error("Failed to create comment")
+    const comment = await commentPayload.comment;
+    if (!comment) throw new Error("Failed to create comment");
 
-    const issue = await comment.issue
+    const issue = await comment.issue;
     return {
       comment,
       issue,
-    }
+    };
   }
 
   async getTeamIssues(teamId: string) {
-    const team = await this.rateLimiter.enqueue(() => this.client.team(teamId))
-    if (!team) throw new Error(`Team ${teamId} not found`)
+    const team = await this.rateLimiter.enqueue(() => this.client.team(teamId));
+    if (!team) throw new Error(`Team ${teamId} not found`);
 
     const { nodes: issues } = await this.rateLimiter.enqueue(() =>
       team.issues()
-    )
+    );
 
     const issuesWithDetails = await this.rateLimiter.batch(
       issues,
       5,
       async (issue) => {
-        const statePromise = issue.state
-        const assigneePromise = issue.assignee
+        const statePromise = issue.state;
+        const assigneePromise = issue.assignee;
 
         const [state, assignee] = await Promise.all([
           this.rateLimiter.enqueue(async () =>
@@ -518,7 +518,7 @@ class LinearMCPClient {
           this.rateLimiter.enqueue(async () =>
             assigneePromise ? await assigneePromise : null
           ),
-        ])
+        ]);
 
         return {
           id: issue.id,
@@ -529,19 +529,19 @@ class LinearMCPClient {
           status: state?.name,
           assignee: assignee?.name,
           url: issue.url,
-        }
+        };
       }
-    )
+    );
 
-    return this.addMetricsToResponse(issuesWithDetails)
+    return this.addMetricsToResponse(issuesWithDetails);
   }
 
   async getViewer() {
-    const viewer = await this.client.viewer
+    const viewer = await this.client.viewer;
     const [teams, organization] = await Promise.all([
       viewer.teams(),
       this.client.organization,
-    ])
+    ]);
 
     return this.addMetricsToResponse({
       id: viewer.id,
@@ -558,15 +558,15 @@ class LinearMCPClient {
         name: organization.name,
         urlKey: organization.urlKey,
       },
-    })
+    });
   }
 
   async getOrganization() {
-    const organization = await this.client.organization
+    const organization = await this.client.organization;
     const [teams, users] = await Promise.all([
       organization.teams(),
       organization.users(),
-    ])
+    ]);
 
     return this.addMetricsToResponse({
       id: organization.id,
@@ -584,29 +584,29 @@ class LinearMCPClient {
         admin: user.admin,
         active: user.active,
       })),
-    })
+    });
   }
 
   private buildSearchFilter(args: SearchIssuesArgs): any {
-    const filter: any = {}
+    const filter: any = {};
 
     if (args.query) {
       filter.or = [
         { title: { contains: args.query } },
         { description: { contains: args.query } },
-      ]
+      ];
     }
 
     if (args.teamId) {
-      filter.team = { id: { eq: args.teamId } }
+      filter.team = { id: { eq: args.teamId } };
     }
 
     if (args.status) {
-      filter.state = { name: { eq: args.status } }
+      filter.state = { name: { eq: args.status } };
     }
 
     if (args.assigneeId) {
-      filter.assignee = { id: { eq: args.assigneeId } }
+      filter.assignee = { id: { eq: args.assigneeId } };
     }
 
     if (args.labels && args.labels.length > 0) {
@@ -614,18 +614,18 @@ class LinearMCPClient {
         some: {
           name: { in: args.labels },
         },
-      }
+      };
     }
 
     if (args.priority) {
-      filter.priority = { eq: args.priority }
+      filter.priority = { eq: args.priority };
     }
 
     if (args.estimate) {
-      filter.estimate = { eq: args.estimate }
+      filter.estimate = { eq: args.estimate };
     }
 
-    return filter
+    return filter;
   }
 }
 
@@ -644,7 +644,7 @@ const createIssueTool: Tool = {
     },
     required: ["title", "teamId"],
   },
-}
+};
 
 const updateIssueTool: Tool = {
   name: "linear_update_issue",
@@ -661,7 +661,7 @@ const updateIssueTool: Tool = {
     },
     required: ["id"],
   },
-}
+};
 
 const searchIssuesTool: Tool = {
   name: "linear_search_issues",
@@ -706,7 +706,7 @@ const searchIssuesTool: Tool = {
       },
     },
   },
-}
+};
 
 const getUserIssuesTool: Tool = {
   name: "linear_get_user_issues",
@@ -730,7 +730,7 @@ const getUserIssuesTool: Tool = {
       },
     },
   },
-}
+};
 
 const addCommentTool: Tool = {
   name: "linear_add_comment",
@@ -752,7 +752,7 @@ const addCommentTool: Tool = {
     },
     required: ["issueId", "body"],
   },
-}
+};
 
 const resourceTemplates: ResourceTemplate[] = [
   {
@@ -816,7 +816,7 @@ const resourceTemplates: ResourceTemplate[] = [
       "linear-user:///me/assigned",
     ],
   },
-]
+];
 
 const serverPrompt: Prompt = {
   name: "linear-server-prompt",
@@ -886,29 +886,29 @@ Resource patterns:
 - linear-viewer: - Current user context
 
 The server uses the authenticated user's permissions for all operations.`,
-}
+};
 
 interface MCPMetricsResponse {
   apiMetrics: {
-    requestsInLastHour: number
-    remainingRequests: number
-    averageRequestTime: string
-    queueLength: number
-  }
+    requestsInLastHour: number;
+    remainingRequests: number;
+    averageRequestTime: string;
+    queueLength: number;
+  };
 }
 
 async function main() {
   try {
-    dotenv.config()
+    dotenv.config();
 
-    const apiKey = process.env.LINEAR_API_KEY
+    const apiKey = process.env.LINEAR_API_KEY;
     if (!apiKey) {
-      console.error("LINEAR_API_KEY environment variable is required")
-      process.exit(1)
+      console.error("LINEAR_API_KEY environment variable is required");
+      process.exit(1);
     }
 
-    console.error("Starting Linear MCP Server...")
-    const linearClient = new LinearMCPClient(apiKey)
+    console.error("Starting Linear MCP Server...");
+    const linearClient = new LinearMCPClient(apiKey);
 
     const server = new Server(
       {
@@ -927,18 +927,18 @@ async function main() {
           tools: {},
         },
       }
-    )
+    );
 
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       resources: await linearClient.listIssues(),
-    }))
+    }));
 
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      const uri = new URL(request.params.uri)
-      const path = uri.pathname.replace(/^\//, "")
+      const uri = new URL(request.params.uri);
+      const path = uri.pathname.replace(/^\//, "");
 
       if (uri.protocol === "linear-organization") {
-        const organization = await linearClient.getOrganization()
+        const organization = await linearClient.getOrganization();
         return {
           contents: [
             {
@@ -947,11 +947,11 @@ async function main() {
               text: JSON.stringify(organization, null, 2),
             },
           ],
-        }
+        };
       }
 
       if (uri.protocol === "linear-viewer") {
-        const viewer = await linearClient.getViewer()
+        const viewer = await linearClient.getViewer();
         return {
           contents: [
             {
@@ -960,11 +960,11 @@ async function main() {
               text: JSON.stringify(viewer, null, 2),
             },
           ],
-        }
+        };
       }
 
       if (uri.protocol === "linear-issue:") {
-        const issue = await linearClient.getIssue(path)
+        const issue = await linearClient.getIssue(path);
         return {
           contents: [
             {
@@ -973,12 +973,12 @@ async function main() {
               text: JSON.stringify(issue, null, 2),
             },
           ],
-        }
+        };
       }
 
       if (uri.protocol === "linear-team:") {
-        const [teamId] = path.split("/")
-        const issues = await linearClient.getTeamIssues(teamId)
+        const [teamId] = path.split("/");
+        const issues = await linearClient.getTeamIssues(teamId);
         return {
           contents: [
             {
@@ -987,14 +987,14 @@ async function main() {
               text: JSON.stringify(issues, null, 2),
             },
           ],
-        }
+        };
       }
 
       if (uri.protocol === "linear-user:") {
-        const [userId] = path.split("/")
+        const [userId] = path.split("/");
         const issues = await linearClient.getUserIssues({
           userId: userId === "me" ? undefined : userId,
-        })
+        });
         return {
           contents: [
             {
@@ -1003,11 +1003,11 @@ async function main() {
               text: JSON.stringify(issues, null, 2),
             },
           ],
-        }
+        };
       }
 
-      throw new Error(`Unsupported resource URI: ${request.params.uri}`)
-    })
+      throw new Error(`Unsupported resource URI: ${request.params.uri}`);
+    });
 
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
@@ -1017,28 +1017,28 @@ async function main() {
         getUserIssuesTool,
         addCommentTool,
       ],
-    }))
+    }));
 
     server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
       return {
         resourceTemplates: resourceTemplates,
-      }
-    })
+      };
+    });
 
     server.setRequestHandler(ListPromptsRequestSchema, async () => {
       return {
         prompts: [serverPrompt],
-      }
-    })
+      };
+    });
 
     server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       if (request.params.name === serverPrompt.name) {
         return {
           prompt: serverPrompt,
-        }
+        };
       }
-      throw new Error(`Prompt not found: ${request.params.name}`)
-    })
+      throw new Error(`Prompt not found: ${request.params.name}`);
+    });
 
     server.setRequestHandler(
       CallToolRequestSchema,
@@ -1049,13 +1049,13 @@ async function main() {
           averageRequestTime: 0,
           queueLength: 0,
           lastRequestTime: Date.now(),
-        }
+        };
 
         try {
-          const { name, arguments: args } = request.params
-          if (!args) throw new Error("Missing arguments")
+          const { name, arguments: args } = request.params;
+          if (!args) throw new Error("Missing arguments");
 
-          metrics = linearClient.rateLimiter.getMetrics()
+          metrics = linearClient.rateLimiter.getMetrics();
 
           const baseResponse: MCPMetricsResponse = {
             apiMetrics: {
@@ -1066,12 +1066,12 @@ async function main() {
               averageRequestTime: `${Math.round(metrics.averageRequestTime)}ms`,
               queueLength: metrics.queueLength,
             },
-          }
+          };
 
           switch (name) {
             case "linear_create_issue": {
               if (!args.title || !args.teamId) {
-                throw new Error("Missing required fields: title and teamId")
+                throw new Error("Missing required fields: title and teamId");
               }
 
               const createArgs: CreateIssueArgs = {
@@ -1082,9 +1082,9 @@ async function main() {
                   : undefined,
                 priority: args.priority ? Number(args.priority) : undefined,
                 status: args.status ? String(args.status) : undefined,
-              }
+              };
 
-              const issue = await linearClient.createIssue(createArgs)
+              const issue = await linearClient.createIssue(createArgs);
               return {
                 content: [
                   {
@@ -1093,12 +1093,12 @@ async function main() {
                     metadata: baseResponse,
                   },
                 ],
-              }
+              };
             }
 
             case "linear_update_issue": {
               if (!args.id) {
-                throw new Error("Missing required field: id")
+                throw new Error("Missing required field: id");
               }
 
               const updateArgs: UpdateIssueArgs = {
@@ -1109,9 +1109,9 @@ async function main() {
                   : undefined,
                 priority: args.priority ? Number(args.priority) : undefined,
                 status: args.status ? String(args.status) : undefined,
-              }
+              };
 
-              const issue = await linearClient.updateIssue(updateArgs)
+              const issue = await linearClient.updateIssue(updateArgs);
               return {
                 content: [
                   {
@@ -1120,7 +1120,7 @@ async function main() {
                     metadata: baseResponse,
                   },
                 ],
-              }
+              };
             }
 
             case "linear_search_issues": {
@@ -1138,9 +1138,9 @@ async function main() {
                   ? Boolean(args.includeArchived)
                   : undefined,
                 limit: args.limit ? Number(args.limit) : undefined,
-              }
+              };
 
-              const issues = await linearClient.searchIssues(searchArgs)
+              const issues = await linearClient.searchIssues(searchArgs);
               return {
                 content: [
                   {
@@ -1158,7 +1158,7 @@ async function main() {
                     metadata: baseResponse,
                   },
                 ],
-              }
+              };
             }
 
             case "linear_get_user_issues": {
@@ -1168,7 +1168,7 @@ async function main() {
                   ? Boolean(args.includeArchived)
                   : undefined,
                 limit: args.limit ? Number(args.limit) : undefined,
-              })
+              });
 
               return {
                 content: [
@@ -1185,12 +1185,12 @@ async function main() {
                     metadata: baseResponse,
                   },
                 ],
-              }
+              };
             }
 
             case "linear_add_comment": {
               if (!args.issueId || !args.body) {
-                throw new Error("Missing required fields: issueId and body")
+                throw new Error("Missing required fields: issueId and body");
               }
 
               const { comment, issue } = await linearClient.addComment({
@@ -1202,7 +1202,7 @@ async function main() {
                 displayIconUrl: args.displayIconUrl
                   ? String(args.displayIconUrl)
                   : undefined,
-              })
+              });
 
               return {
                 content: [
@@ -1212,14 +1212,14 @@ async function main() {
                     metadata: baseResponse,
                   },
                 ],
-              }
+              };
             }
 
             default:
-              throw new Error(`Unknown tool: ${name}`)
+              throw new Error(`Unknown tool: ${name}`);
           }
         } catch (error) {
-          console.error("Error executing tool:", error)
+          console.error("Error executing tool:", error);
 
           const errorResponse: MCPMetricsResponse = {
             apiMetrics: {
@@ -1230,7 +1230,7 @@ async function main() {
               averageRequestTime: `${Math.round(metrics.averageRequestTime)}ms`,
               queueLength: metrics.queueLength,
             },
-          }
+          };
 
           return {
             content: [
@@ -1245,22 +1245,22 @@ async function main() {
                 },
               },
             ],
-          }
+          };
         }
       }
-    )
+    );
 
-    const transport = new StdioServerTransport()
-    console.error("Connecting server to transport...")
-    await server.connect(transport)
-    console.error("Linear MCP Server running on stdio")
+    const transport = new StdioServerTransport();
+    console.error("Connecting server to transport...");
+    await server.connect(transport);
+    console.error("Linear MCP Server running on stdio");
   } catch (error) {
     console.error(
       `Fatal error in main(): ${
         error instanceof Error ? error.message : String(error)
       }`
-    )
-    process.exit(1)
+    );
+    process.exit(1);
   }
 }
 
@@ -1268,6 +1268,6 @@ main().catch((error: unknown) => {
   console.error(
     "Fatal error in main():",
     error instanceof Error ? error.message : String(error)
-  )
-  process.exit(1)
-})
+  );
+  process.exit(1);
+});
